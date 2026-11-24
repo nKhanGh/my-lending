@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import {
   ArrowLeft,
   ArrowRight,
@@ -17,7 +18,7 @@ interface Props {
   repayments: RepaymentHistory[];
   busy: boolean;
   onBack: () => void;
-  onRepay: (id: string) => Promise<void>;
+  onRepay: (id: string, amount?: number) => Promise<void>;
 }
 
 export function DrawdownDetailView({
@@ -30,7 +31,9 @@ export function DrawdownDetailView({
   const paidCount = detail.instalments.filter(
     (item) => item.status === "PAID",
   ).length;
-  const next = detail.instalments.find((item) => item.status === "UNPAID");
+  const next = detail.instalments.find((item) => item.status !== "PAID");
+  const [partialAmount, setPartialAmount] = useState("");
+  useEffect(() => setPartialAmount(""), [next?.id]);
   return (
     <div className={styles.pageFade}>
       <button className={styles.backButton} onClick={onBack}>
@@ -108,7 +111,10 @@ export function DrawdownDetailView({
                     </small>
                   </span>
                   <span className={styles.instalmentRight}>
-                    <strong>{currency(item.amount)}</strong>
+                    <strong>
+                      {currency(item.remainingAmount)}{" "}
+                      <small>/ {currency(item.amount)}</small>
+                    </strong>
                     {item.status === "PAID" ? (
                       <small className={styles.paidLabel}>ĐÃ TRẢ</small>
                     ) : payable ? (
@@ -137,13 +143,33 @@ export function DrawdownDetailView({
                   <Clock3 size={20} />
                 </span>
                 <span className={styles.overlineLight}>KỲ CẦN THANH TOÁN</span>
-                <strong>{currency(next.amount)}</strong>
+                <strong>{currency(next.remainingAmount)}</strong>
+                <label className={styles.partialLabel}>
+                  Số tiền trả kỳ này
+                  <input
+                    type="number"
+                    min="0.01"
+                    max={next.remainingAmount}
+                    step="0.01"
+                    placeholder="Để trống để trả toàn bộ"
+                    value={partialAmount}
+                    onChange={(event) => setPartialAmount(event.target.value)}
+                  />
+                </label>
                 <p>
-                  Kỳ {next.sequenceNo} · Đến hạn {shortDate(next.dueDate)}
+                  Kỳ {next.sequenceNo} ·{" "}
+                  {next.daysPastDue > 0
+                    ? `Quá hạn ${next.daysPastDue} ngày`
+                    : `Đến hạn ${shortDate(next.dueDate)}`}
                 </p>
                 <button
                   className={styles.goldButton}
-                  onClick={() => onRepay(next.id)}
+                  onClick={() =>
+                    onRepay(
+                      next.id,
+                      partialAmount ? Number(partialAmount) : undefined,
+                    )
+                  }
                   disabled={busy}
                 >
                   {busy ? "Đang xử lý…" : "Trả kỳ tiếp theo"}{" "}

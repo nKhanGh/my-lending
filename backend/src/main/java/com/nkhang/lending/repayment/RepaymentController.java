@@ -17,9 +17,10 @@ public class RepaymentController {
 
     @PostMapping("/api/instalments/{id}/repay")
     public ResponseEntity<ApiResponse<RepaymentResponse>> repay(@PathVariable UUID id,
-            @RequestHeader("Idempotency-Key") String key) {
+            @RequestHeader("Idempotency-Key") String key,
+            @Valid @RequestBody(required = false) RepaymentRequest request) {
         return ResponseEntity.status(HttpStatus.ACCEPTED)
-                .body(ApiResponse.success(service.repay(id, key), "Payment pending"));
+                .body(ApiResponse.success(service.repay(id, key, request == null ? null : request.amount()), "Payment pending"));
     }
     @GetMapping("/api/payments/{id}")
     public ApiResponse<RepaymentResponse> payment(@PathVariable UUID id) {

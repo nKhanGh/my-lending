@@ -182,6 +182,26 @@ class CreditLineFlowIntegrationTest extends PostgresIntegrationTest {
     }
 
     @Test
+    void partialPaymentsRestoreOnlySettledPrincipal() {
+        approve();
+        var drawdown = drawdownService.utilize(new DrawdownRequest(money("400.00")), "partial-draw");
+        var first = drawdownService.get(drawdown.drawdownId()).instalments().get(0);
+        var part = repaymentService.repay(first.id(), "part-1", money("30.25"));
+        assertEquals(RepaymentTransaction.Status.PENDING, part.status());
+        assertMoney("400.00", accountService.getAccount().usedLimit());
+        repaymentService.settle(part.repaymentId(), RepaymentTransaction.Status.SUCCESS, "part-event-1");
+        assertMoney("369.75", accountService.getAccount().usedLimit());
+        assertMoney("69.75", instalmentRepository.findById(first.id()).orElseThrow().getRemainingAmount());
+        assertEquals(ErrorCode.INVALID_REQUEST,
+                assertThrows(AppException.class, () -> repaymentService.repay(first.id(), "overpay", money("69.76")))
+                        .getErrorCode());
+        var rest = repaymentService.repay(first.id(), "part-2", money("69.75"));
+        repaymentService.settle(rest.repaymentId(), RepaymentTransaction.Status.SUCCESS, "part-event-2");
+        assertMoney("300.00", accountService.getAccount().usedLimit());
+        assertEquals(2, repaymentService.history(drawdown.drawdownId()).size());
+    }
+
+    @Test
     void invalidScheduleRollsBackAccountUtilization() {
         approve();
         assertThrows(AppException.class, () -> drawdownService.utilize(

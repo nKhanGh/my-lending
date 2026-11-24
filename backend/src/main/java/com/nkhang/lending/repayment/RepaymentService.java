@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.time.Clock;
 import java.time.Instant;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 
@@ -30,28 +31,44 @@ public class RepaymentService {
 
     @Transactional
     public RepaymentResponse repay(UUID instalmentId, String rawKey) {
+        return repay(instalmentId, rawKey, null);
+    }
+
+    @Transactional
+    public RepaymentResponse repay(UUID instalmentId, String rawKey, BigDecimal requestedAmount) {
+        if (requestedAmount != null && (requestedAmount.scale() > 2 || requestedAmount.signum() <= 0)) {
+            throw new AppException(ErrorCode.INVALID_REQUEST, "Payment amount must be positive with at most two decimals");
+        }
         String key = IdempotencyKeys.requireValid(rawKey);
         var account = accountService.lockAccount();
         var existing = repayments.findByUserIdAndIdempotencyKey(account.getUserId(), key);
         if (existing.isPresent()) {
             var payment = existing.get();
-            if (!payment.getInstalmentId().equals(instalmentId)) throw new AppException(ErrorCode.IDEMPOTENCY_KEY_REUSED);
+            if (!payment.getInstalmentId().equals(instalmentId)
+                    || (requestedAmount != null && payment.getAmount().compareTo(requestedAmount) != 0)) {
+                throw new AppException(ErrorCode.IDEMPOTENCY_KEY_REUSED);
+            }
             var priorDrawdown = ownedDrawdown(payment.getInstalmentId(), account.getId());
             return RepaymentResponse.from(payment, priorDrawdown.getOutstandingPrincipal(), account.getAvailableLimit());
         }
         var instalment = instalments.findById(instalmentId)
                 .orElseThrow(() -> new AppException(ErrorCode.RESOURCE_NOT_FOUND, "Instalment not found"));
         var drawdown = ownedDrawdown(instalmentId, account.getId());
-        var next = instalments.findFirstByDrawdownIdAndStatusOrderBySequenceNo(drawdown.getId(), Instalment.Status.UNPAID);
+        var next = instalments.findFirstByDrawdownIdAndStatusInOrderBySequenceNo(drawdown.getId(),
+                List.of(Instalment.Status.UNPAID, Instalment.Status.OVERDUE));
         if (next.isEmpty() || !next.get().getId().equals(instalmentId)
-                || instalment.getStatus() != Instalment.Status.UNPAID) {
+                || instalment.getStatus() == Instalment.Status.PAID) {
             throw new AppException(ErrorCode.INVALID_REPAYMENT_STATE);
         }
         if (repayments.existsByInstalmentIdAndStatus(instalmentId, RepaymentTransaction.Status.PENDING)) {
             throw new AppException(ErrorCode.PAYMENT_ALREADY_PENDING);
         }
+        BigDecimal amount = requestedAmount == null ? instalment.getRemainingAmount() : requestedAmount;
+        if (amount.compareTo(instalment.getRemainingAmount()) > 0) {
+            throw new AppException(ErrorCode.INVALID_REQUEST, "Payment exceeds remaining instalment amount");
+        }
         var payment = repayments.save(new RepaymentTransaction(account.getUserId(), instalmentId,
-                instalment.getAmount(), Instant.now(clock), key));
+                amount, Instant.now(clock), key));
         return RepaymentResponse.from(payment, drawdown.getOutstandingPrincipal(), account.getAvailableLimit());
     }
 
@@ -79,8 +96,11 @@ public class RepaymentService {
         if (repayments.existsByProviderEventId(eventId)) throw new AppException(ErrorCode.PAYMENT_ALREADY_RESOLVED);
         Instant now = Instant.now(clock);
         if (outcome == RepaymentTransaction.Status.SUCCESS) {
-            if (instalment.getStatus() != Instalment.Status.UNPAID) throw new AppException(ErrorCode.PAYMENT_ALREADY_RESOLVED);
-            instalment.markPaid(now);
+            if (instalment.getStatus() == Instalment.Status.PAID
+                    || candidate.getAmount().compareTo(instalment.getRemainingAmount()) > 0) {
+                throw new AppException(ErrorCode.PAYMENT_ALREADY_RESOLVED);
+            }
+            instalment.applyPayment(candidate.getAmount(), now);
             drawdown.repay(candidate.getAmount());
             account.restore(candidate.getAmount());
         }

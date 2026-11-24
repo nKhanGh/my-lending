@@ -157,13 +157,17 @@ export default function App() {
     }
   }
 
-  async function repay(instalmentId: string) {
+  async function repay(instalmentId: string, amount?: number) {
     if (!detail) return;
-    const action = `repay:${instalmentId}`;
+    const action = `repay:${instalmentId}:${amount?.toFixed(2) ?? "remaining"}`;
     setBusy(true);
     setError("");
     try {
-      const requested = await api.repay(instalmentId, idempotencyKey(action));
+      const requested = await api.repay(
+        instalmentId,
+        idempotencyKey(action),
+        amount,
+      );
       setNotice("Yêu cầu đã gửi. Đang chờ kết quả thanh toán…");
       let outcome = requested;
       for (let poll = 0; poll < 30 && outcome.status === "PENDING"; poll++) {

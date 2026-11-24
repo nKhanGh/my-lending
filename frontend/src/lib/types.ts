@@ -36,8 +36,10 @@ export interface Instalment {
   id: string;
   sequenceNo: number;
   amount: number;
+  remainingAmount: number;
   dueDate: string;
-  status: "UNPAID" | "PAID";
+  status: "UNPAID" | "OVERDUE" | "PAID";
+  daysPastDue: number;
   paidAt: string | null;
 }
 

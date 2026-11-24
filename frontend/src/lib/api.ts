@@ -98,8 +98,12 @@ export const api = {
     get<RepaymentHistory[]>(`/credit-drawdowns/${id}/repayments`),
   utilize: (amount: number, key: string) =>
     post<Drawdown>("/credit-drawdowns", { amount }, key),
-  repay: (instalmentId: string, key: string) =>
-    post<Repayment>(`/instalments/${instalmentId}/repay`, undefined, key),
+  repay: (instalmentId: string, key: string, amount?: number) =>
+    post<Repayment>(
+      `/instalments/${instalmentId}/repay`,
+      amount ? { amount } : undefined,
+      key,
+    ),
 };
 
 export function idempotencyKey(action: string): string {

@@ -2097,3 +2097,21 @@
     padding: 60px 0;
   }
 }
+
+.partialLabel {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  color: #d9d1bb;
+  font-size: 11px;
+  margin: 10px 0;
+}
+.partialLabel input {
+  height: 42px;
+  border: 1px solid #91a59a;
+  border-radius: 8px;
+  padding: 0 12px;
+  background: #f7f7f1;
+  color: #183a31;
+  font: inherit;
+}
