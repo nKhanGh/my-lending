@@ -2,6 +2,8 @@ package com.nkhang.lending;
 
 import com.nkhang.lending.application.CreditApplicationRepository;
 import com.nkhang.lending.application.CreditApplicationService;
+import com.nkhang.lending.assessment.CreditProfileService;
+import com.nkhang.lending.assessment.dto.CreditProfileRequest;
 import com.nkhang.lending.application.dto.CreditApplicationRequest;
 import com.nkhang.lending.common.exception.AppException;
 import com.nkhang.lending.common.exception.ErrorCode;
@@ -46,6 +48,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class CreditLineFlowIntegrationTest extends PostgresIntegrationTest {
     @Autowired MockMvc mockMvc;
     @Autowired CreditApplicationService applicationService;
+    @Autowired CreditProfileService profileService;
     @Autowired CreditApplicationRepository applicationRepository;
     @Autowired CreditAccountService accountService;
     @Autowired CreditAccountRepository accountRepository;
@@ -68,7 +71,7 @@ class CreditLineFlowIntegrationTest extends PostgresIntegrationTest {
     @BeforeEach
     void reset() {
         authenticate();
-        jdbc.execute("TRUNCATE TABLE credit_applications, credit_accounts CASCADE");
+        jdbc.execute("TRUNCATE TABLE credit_applications, credit_accounts, credit_profiles CASCADE");
     }
 
     @Test
@@ -86,6 +89,20 @@ class CreditLineFlowIntegrationTest extends PostgresIntegrationTest {
         mockMvc.perform(get("/api/credit-account").with(jwt().jwt(token -> token.subject(DEMO_ID))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.result.availableLimit").value(1000));
+    }
+
+    @Test
+    void assessmentPreservesSimulatedProfileSnapshot() {
+        profileService.save(new CreditProfileRequest(6, 2));
+        var rejected = approve();
+        assertEquals("DEMO_V2", rejected.policyVersion());
+        assertEquals("SIMULATED_MISSED_PAYMENTS", rejected.reasonCode());
+        assertEquals(2, rejected.missedPayments());
+        profileService.save(new CreditProfileRequest(10, 0));
+        assertEquals(2, applicationRepository.findById(rejected.applicationId()).orElseThrow().getMissedPayments());
+        var approved = approve();
+        assertEquals("DEMO_V2", approved.policyVersion());
+        assertEquals("APPROVED_TIER_1000", approved.reasonCode());
     }
 
     @Test

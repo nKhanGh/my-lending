@@ -3,6 +3,7 @@ package com.nkhang.lending.application;
 import com.nkhang.lending.application.dto.CreditApplicationRequest;
 import com.nkhang.lending.application.dto.CreditApplicationResponse;
 import com.nkhang.lending.assessment.CreditAssessmentPolicy;
+import com.nkhang.lending.assessment.CreditProfileRepository;
 import com.nkhang.lending.common.exception.AppException;
 import com.nkhang.lending.common.exception.ErrorCode;
 import com.nkhang.lending.creditaccount.CreditAccount;
@@ -23,6 +24,7 @@ public class CreditApplicationService {
     private final CreditApplicationRepository applicationRepository;
     private final CreditAccountRepository accountRepository;
     private final CreditAssessmentPolicy policy;
+    private final CreditProfileRepository profiles;
     private final Clock clock;
     private final CurrentUser currentUser;
 
@@ -41,10 +43,20 @@ public class CreditApplicationService {
         var surplus = request.monthlyNetIncome()
                 .subtract(request.monthlyLivingExpenses())
                 .subtract(request.monthlyDebtPayments());
-        var decision = policy.assess(surplus);
-        var application = applicationRepository.save(new CreditApplication(userId,
+        var profile = profiles.findById(userId);
+        var explained = profile.map(value -> policy.assessV2(surplus, request.monthlyNetIncome(),
+                request.monthlyDebtPayments(), value));
+        var decision = explained.map(CreditAssessmentPolicy.ExplainedDecision::decision)
+                .orElseGet(() -> policy.assess(surplus));
+        var application = new CreditApplication(userId,
                 request.monthlyNetIncome(), request.monthlyLivingExpenses(), request.monthlyDebtPayments(),
-                surplus, decision.status(), decision.reasonCode(), decision.limit(), Instant.now(clock)));
+                surplus, decision.status(), decision.reasonCode(), decision.limit(), Instant.now(clock));
+        if (profile.isPresent()) {
+            application.recordSimulatedAssessment(new CreditApplication.CreditProfileSnapshot(
+                    profile.get().getOnTimePayments(), profile.get().getMissedPayments()),
+                    explained.orElseThrow().debtToIncomeRatio());
+        }
+        applicationRepository.save(application);
         if (decision.status() == CreditApplication.Status.APPROVED) {
             accountRepository.save(new CreditAccount(userId, decision.limit()));
         }

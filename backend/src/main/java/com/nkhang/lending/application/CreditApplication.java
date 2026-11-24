@@ -31,6 +31,9 @@ public class CreditApplication {
     private String decisionReason;
     private String policyVersion;
     private BigDecimal approvedLimit;
+    private Integer onTimePayments;
+    private Integer missedPayments;
+    private BigDecimal debtToIncomeRatio;
     private Instant assessedAt;
 
     public CreditApplication(UUID userId, BigDecimal monthlyNetIncome, BigDecimal livingExpenses,
@@ -48,4 +51,13 @@ public class CreditApplication {
         this.approvedLimit = approvedLimit;
         this.assessedAt = assessedAt;
     }
+
+    public void recordSimulatedAssessment(CreditProfileSnapshot profile, BigDecimal ratio) {
+        policyVersion = "DEMO_V2";
+        onTimePayments = profile.onTimePayments();
+        missedPayments = profile.missedPayments();
+        debtToIncomeRatio = ratio;
+    }
+
+    public record CreditProfileSnapshot(int onTimePayments, int missedPayments) {}
 }
