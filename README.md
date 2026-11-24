@@ -1,110 +1,68 @@
-# Mini Lending — Credit Line & Repayment Simulator
+# Mini Lending — Credit Line Simulator
 
-Full-stack proof of concept based on the user-provided `mini-lending-credit-line-30h.md` brief. One seeded demo user receives a rule-based credit decision, uses a simulated SGD credit line, sees four monthly instalments, and pays them in full one at a time. No real loan, payment, transfer, or credit decision is made.
+Spring Boot 3 / Java 21 backend, React / TypeScript / CSS Modules frontend, and PostgreSQL. This is a multi-user simulator. It does not make real credit decisions or move real money.
 
-The repository has a Spring Boot backend in `backend/`, a React and CSS Modules frontend in `frontend/`, and one PostgreSQL service in `docker-compose.yml`. The [implementation plan](IMPLEMENTATION_PLAN.md) records the exact MVP rules, schema, tests, and commit sequence.
+The original brief is preserved in [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md). The five later features are described in [EXTENSION_PLAN.md](EXTENSION_PLAN.md).
 
-## Requirements
+## Run locally
 
-- Java 21 and Maven 3.9+
-- Node.js 20+ and npm
-- Docker Desktop with a running Linux engine
+Requirements: Java 21, Maven 3.9+, Node.js 20+, Docker Desktop.
 
-## Start locally
+From the repository root, run:
 
-From the repository root:
+    docker compose up -d postgres
+    cd backend
+    mvn spring-boot:run
 
-```powershell
-docker compose up -d postgres
-```
+In another terminal, run:
 
-In a second terminal:
+    cd frontend
+    npm ci
+    npm run dev
 
-```powershell
-cd backend
-mvn spring-boot:run
-```
+Open http://127.0.0.1:5173/. Swagger UI is at http://localhost:8080/swagger-ui.html. Vite proxies /api to Spring Boot. Compose publishes PostgreSQL on port 55432. Flyway applies V1–V6, including backfills for older repayment data.
 
-In a third terminal:
+Register in the UI or sign in locally as demo@local.test with password DemoPass123!. Change DEMO_PASSWORD before exposing the demo beyond localhost. JWT_SECRET accepts at least 32 bytes; when blank, the backend generates a fresh signing key at each start and existing sessions expire. Set ADMIN_EMAIL and ADMIN_PASSWORD (at least eight characters) to seed an admin user for simulator controls. Export overrides to the backend process; Compose's .env file alone does not configure Maven. See [.env.example](.env.example).
 
-```powershell
-cd frontend
-npm ci
-npm run dev
-```
+## Try the scenario
 
-Open `http://127.0.0.1:5173/` for the UI or `http://localhost:8080/swagger-ui.html` for the API documentation. Vite proxies `/api` to the backend. Defaults: PostgreSQL `localhost:55432`, API `localhost:8080`, UI `127.0.0.1:5173`. See `.env.example` and `frontend/.env.example` for overrides. Flyway creates the six tables and seeds one demo user on a fresh database.
+1. Submit income 3000, living expenses 1400, and existing debt payments 500. With no optional profile, DEMO_V1 grants SGD 1000. Enable simulated repayment history on the form to use DEMO_V2.
+2. Draw SGD 800. Four monthly principal instalments are created; available limit is SGD 200.
+3. Request full or partial payment for the earliest open instalment. The response is PENDING and leaves balances unchanged. The simulator settles after five seconds; its default deterministic failure rate is 10%. The UI polls for the result. A failed attempt allows a new retry.
+4. A successful payment reduces the instalment remaining amount, drawdown principal, and used limit by the same amount. The daily UTC job marks past-due open instalments OVERDUE.
 
-The app uses one account for that demo user. To rerun the scenario from an empty database, stop the app and use `docker compose down -v`, then restart the stack. That command deletes all data in this repository's Compose volume.
+## API
 
-## Three-minute demo
+All business endpoints require an Authorization: Bearer token. Register and login are public. Admin paths require the ADMIN role. Responses use the ApiResponse envelope with the payload in result.
 
-1. Submit monthly net income `3000`, living expenses `1400`, and existing debt payments `500`.
-2. See `APPROVED`, reason `APPROVED_TIER_1000`, policy `DEMO_V1`, surplus SGD 1100 and limit SGD 1000.
-3. Use SGD 800. Available limit becomes SGD 200; four SGD 200 instalments are created.
-4. Pay the first instalment. Outstanding principal becomes SGD 600 and available limit becomes SGD 400.
-5. Pay the remaining three. The drawdown becomes `PAID_OFF`, outstanding becomes zero and available returns to SGD 1000.
+| Method     | Path                                                      | Purpose                                                                   |
+| ---------- | --------------------------------------------------------- | ------------------------------------------------------------------------- |
+| POST       | /api/auth/register, /api/auth/login                       | Account creation and one-hour JWT                                         |
+| GET        | /api/auth/me                                              | Current user                                                              |
+| PUT / GET  | /api/credit-profile                                       | Optional simulated on-time/missed payment counts                          |
+| POST / GET | /api/credit-applications, /api/credit-applications/latest | Decision and stored explanation                                           |
+| GET        | /api/credit-account                                       | Own limit and used balance                                                |
+| POST / GET | /api/credit-drawdowns, /api/credit-drawdowns/{id}         | Drawdown, list, schedule                                                  |
+| POST       | /api/instalments/{id}/repay                               | Payment request; Idempotency-Key required; optional body {"amount":30.25} |
+| GET        | /api/payments/{id}                                        | Poll PENDING, SUCCESS, or FAILED                                          |
+| GET        | /api/credit-drawdowns/{id}/repayments                     | Own payment attempt history                                               |
+| GET        | /api/audit-events                                         | Own audit history                                                         |
+| POST       | /api/admin/payments/{id}/settle                           | Admin callback with outcome and unique providerEventId                    |
+| GET        | /api/admin/reconciliation                                 | Compare account, drawdown, instalment, and ledger sums                    |
+| GET        | /api/admin/users/{id}/audit-events                        | Admin audit inspection                                                    |
 
-The system rejects a drawdown above the available limit. A concurrent limit test and idempotency tests prove that duplicate requests do not increase debt or restore the limit twice.
+The simulator callback and admin callback share one transaction. A duplicate callback with the same event and outcome returns the terminal attempt. Contradictory or reused events return 409 without changing balances. A fresh idempotency key is needed after a confirmed failure. The frontend retains the key while the network result is unknown.
 
-## Backend API
+DEMO_V2 rejects two or more simulated missed payments or monthly debt payments greater than 40% of net income, then applies the original surplus tiers. Each application stores its profile snapshot, displayed ratio, reason, and policy version. These are invented simulator rules, not real underwriting criteria.
 
-Success and error bodies use the `ApiResponse<T>` envelope, with successful payloads in `result`.
-
-| Method | Path                                    | Purpose                                                            |
-| ------ | --------------------------------------- | ------------------------------------------------------------------ |
-| POST   | `/api/credit-applications`              | Assess three financial inputs and create an account on approval    |
-| GET    | `/api/credit-applications/latest`       | Latest application decision                                        |
-| GET    | `/api/credit-account`                   | Total, used and available limit                                    |
-| POST   | `/api/credit-drawdowns`                 | Use credit; requires `Idempotency-Key`                             |
-| GET    | `/api/credit-drawdowns`                 | List drawdowns                                                     |
-| GET    | `/api/credit-drawdowns/{id}`            | Detail and four instalments                                        |
-| POST   | `/api/instalments/{id}/repay`           | Pay the next unpaid instalment in full; requires `Idempotency-Key` |
-| GET    | `/api/credit-drawdowns/{id}/repayments` | Simulated payment history                                          |
-
-Example assessment body:
-
-```json
-{
-  "monthlyNetIncome": 3000.0,
-  "monthlyLivingExpenses": 1400.0,
-  "monthlyDebtPayments": 500.0,
-  "currency": "SGD"
-}
-```
-
-Example utilization body and header:
-
-```http
-POST /api/credit-drawdowns
-Idempotency-Key: draw-001
-Content-Type: application/json
-
-{"amount":800.00}
-```
-
-Use the returned drawdown ID to read its instalments. Pass the first instalment UUID to `POST /api/instalments/{id}/repay` with a new idempotency key such as `repay-001`.
-
-Validation failures return `400`, missing resources return `404`, and insufficient limit, wrong payment order, duplicate payment with another key, or key reuse with different input return `409`. A retry of the same operation with the same key does not change balances again. The React client keeps a key for an uncertain network result and clears it after confirmed success or a definite client error.
-
-## Rules and limits
-
-- Surplus below SGD 400 is rejected; surplus from 400, 800, and 1500 grants limits of SGD 500, 1000, and 2000 respectively.
-- Money is stored as `NUMERIC(19,2)` and calculated using `BigDecimal`. The first three instalments are rounded down to cents; the fourth receives the remainder.
-- Drawdown must be at least SGD 0.04 so four positive instalments can be created.
-- Account balance changes are serialized by a PostgreSQL row lock and committed with drawdown or repayment records in one transaction.
-- Only the earliest unpaid instalment can be paid, although early full payment is allowed.
-- Authentication, real payment processing, partial payments, overdue processing, interest, ledger, and multiple users are outside this MVP.
+Each drawdown and successful repayment writes a signed principal movement in the same database transaction. Flyway backfills older data. Ledger and audit tables reject UPDATE and DELETE. Reconciliation reports matched=false when sums differ. There is no external event publisher, so the simulator does not need an outbox.
 
 ## Verify
 
-```powershell
-cd backend
-mvn clean verify
+    cd backend
+    mvn clean test
+    cd ../frontend
+    npm run format:check
+    npm run build
 
-cd ../frontend
-npm ci
-npm run build
-```
-
-Backend tests use PostgreSQL Testcontainers and cover policy thresholds, money rounding, concurrent drawdowns, retries, payment order, closure, and rollback. The UI was checked against the running API with the `3000 / 1400 / 500 → 800 → first repayment` flow.
+Backend tests use PostgreSQL Testcontainers for two-user isolation, concurrent drawdown locking, async success/failure and repeated callbacks, partial payments, fixed-clock overdue dates, policy snapshots, and ledger mismatches. A running backend JAR can lock Maven's package output on Windows; stop it before mvn clean verify.

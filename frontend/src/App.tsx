@@ -119,10 +119,16 @@ export default function App() {
     }
   }
 
-  async function submitApplication(input: ApplicationInput) {
+  async function submitApplication(
+    input: ApplicationInput,
+    profile?: { onTimePayments: number; missedPayments: number },
+  ) {
     setBusy(true);
     setError("");
     try {
+      if (profile)
+        await api.saveProfile(profile.onTimePayments, profile.missedPayments);
+      else await api.clearProfile();
       const decision = await api.submitApplication(input);
       setApplication(decision);
       if (decision.decision === "APPROVED") {
@@ -227,6 +233,12 @@ export default function App() {
       setLoading(false);
     }
   }
+
+  useEffect(() => {
+    window.addEventListener("mini-lending:unauthorized", logout);
+    return () =>
+      window.removeEventListener("mini-lending:unauthorized", logout);
+  });
 
   function logout() {
     setAuthSession(null);

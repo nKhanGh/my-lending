@@ -37,6 +37,9 @@ client.interceptors.response.use(
   (response) => response,
   (error: AxiosError<ApiResponse<never>>) => {
     const status = error.response?.status;
+    if (status === 401 && !error.config?.url?.startsWith("/auth/")) {
+      window.dispatchEvent(new Event("mini-lending:unauthorized"));
+    }
     const message =
       error.response?.data?.message ??
       (status
@@ -82,6 +85,9 @@ export function setAuthSession(session: AuthSession | null): void {
 }
 
 export const api = {
+  saveProfile: (onTimePayments: number, missedPayments: number) =>
+    client.put("/credit-profile", { onTimePayments, missedPayments }),
+  clearProfile: () => client.delete("/credit-profile"),
   login: (email: string, password: string) =>
     post<AuthSession>("/auth/login", { email, password }),
   register: (displayName: string, email: string, password: string) =>

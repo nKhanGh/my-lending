@@ -21,6 +21,9 @@ export interface CreditApplication {
   approvedLimit: number;
   currency: "SGD";
   assessedAt: string;
+  onTimePayments?: number;
+  missedPayments?: number;
+  debtToIncomeRatio?: number;
 }
 
 export interface CreditAccount {

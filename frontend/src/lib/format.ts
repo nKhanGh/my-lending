@@ -39,6 +39,9 @@ export function parseMoney(value: string): number | null {
 }
 
 export const reasonLabel: Record<string, string> = {
+  SIMULATED_MISSED_PAYMENTS: "Lịch sử giả lập có từ hai lần chậm trả.",
+  DEBT_RATIO_ABOVE_40_PERCENT:
+    "Nghĩa vụ nợ vượt 40% thu nhập theo chính sách demo.",
   INSUFFICIENT_SURPLUS:
     "Thu nhập còn lại dưới mức tối thiểu của chính sách demo.",
   APPROVED_TIER_500: "Hạn mức được cấp theo bậc dư thu nhập 400–799 SGD.",

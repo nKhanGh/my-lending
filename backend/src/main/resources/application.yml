@@ -34,4 +34,12 @@ springdoc:
 
 lending:
   demo-user-id: 00000000-0000-0000-0000-000000000001
+  demo-password: ${DEMO_PASSWORD:DemoPass123!}
+  jwt-secret: ${JWT_SECRET:}
+  admin-email: ${ADMIN_EMAIL:}
+  admin-password: ${ADMIN_PASSWORD:}
+  payment-delay-seconds: ${PAYMENT_DELAY_SECONDS:5}
+  payment-failure-percent: ${PAYMENT_FAILURE_PERCENT:10}
+  payment-poll-ms: ${PAYMENT_POLL_MS:1000}
+  overdue-cron: ${OVERDUE_CRON:0 5 0 * * *}
 

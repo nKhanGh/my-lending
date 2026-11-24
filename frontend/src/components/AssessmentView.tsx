@@ -14,7 +14,10 @@ import styles from "../App.module.css";
 interface Props {
   application: CreditApplication | null;
   busy: boolean;
-  onSubmit: (input: ApplicationInput) => Promise<void>;
+  onSubmit: (
+    input: ApplicationInput,
+    profile?: { onTimePayments: number; missedPayments: number },
+  ) => Promise<void>;
   onDashboard: () => void;
 }
 
@@ -28,6 +31,9 @@ export function AssessmentView({
   const [expenses, setExpenses] = useState("1400.00");
   const [debt, setDebt] = useState("500.00");
   const [validation, setValidation] = useState("");
+  const [useHistory, setUseHistory] = useState(false);
+  const [onTime, setOnTime] = useState("4");
+  const [missed, setMissed] = useState("0");
   const values = [parseMoney(income), parseMoney(expenses), parseMoney(debt)];
   const surplus = values.every((value) => value !== null)
     ? values[0]! - values[1]! - values[2]!
@@ -39,13 +45,22 @@ export function AssessmentView({
       setValidation("Nhập số tiền không âm với tối đa 2 chữ số thập phân.");
       return;
     }
+    if (useHistory && (!/^\d+$/.test(onTime) || !/^\d+$/.test(missed))) {
+      setValidation("Số lần trả nợ phải là số nguyên không âm.");
+      return;
+    }
     setValidation("");
-    await onSubmit({
-      monthlyNetIncome: values[0]!,
-      monthlyLivingExpenses: values[1]!,
-      monthlyDebtPayments: values[2]!,
-      currency: "SGD",
-    });
+    await onSubmit(
+      {
+        monthlyNetIncome: values[0]!,
+        monthlyLivingExpenses: values[1]!,
+        monthlyDebtPayments: values[2]!,
+        currency: "SGD",
+      },
+      useHistory
+        ? { onTimePayments: Number(onTime), missedPayments: Number(missed) }
+        : undefined,
+    );
   }
 
   if (application?.decision === "APPROVED") {
@@ -93,6 +108,23 @@ export function AssessmentView({
               <span>Mã lý do</span>
               <strong>{application.reasonCode}</strong>
             </div>
+            {application.debtToIncomeRatio !== undefined && (
+              <div>
+                <span>Tỷ lệ nghĩa vụ nợ</span>
+                <strong>
+                  {(application.debtToIncomeRatio * 100).toFixed(2)}%
+                </strong>
+              </div>
+            )}
+            {application.missedPayments !== undefined && (
+              <div>
+                <span>Lịch sử giả lập</span>
+                <strong>
+                  {application.onTimePayments} đúng hạn ·{" "}
+                  {application.missedPayments} chậm trả
+                </strong>
+              </div>
+            )}
             <div>
               <span>Phiên bản chính sách</span>
               <strong>{application.policyVersion}</strong>
@@ -168,6 +200,38 @@ export function AssessmentView({
               value={debt}
               onChange={setDebt}
             />
+            <label className={styles.historyToggle}>
+              <input
+                type="checkbox"
+                checked={useHistory}
+                onChange={(event) => setUseHistory(event.target.checked)}
+              />
+              Dùng lịch sử trả nợ giả lập (policy DEMO_V2)
+            </label>
+            {useHistory && (
+              <div className={styles.historyFields}>
+                <label>
+                  Số lần đúng hạn
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={onTime}
+                    onChange={(event) => setOnTime(event.target.value)}
+                  />
+                </label>
+                <label>
+                  Số lần chậm trả
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={missed}
+                    onChange={(event) => setMissed(event.target.value)}
+                  />
+                </label>
+              </div>
+            )}
             <div className={styles.surplusPreview}>
               <span>
                 Dư thu nhập dự kiến <small>Thu nhập − chi phí − nợ</small>

@@ -46,3 +46,14 @@ This plan extends the MVP in `IMPLEMENTATION_PLAN.md` after the 30-hour brief. T
 6. Ledger/audit: migrations, reconciliation, audit, tests; `mvn clean verify`; push.
 7. Frontend: auth, payment polling, partial amounts and retry handling; `npm run format:check && npm run build`; push.
 8. README and end-to-end review; push the verified state to `develop` in `nKhanGh/my-lending`.
+
+## Implemented on develop
+
+- Accounts and scoped access: d24e058.
+- Asynchronous payment and frontend auth/retry: 64adfc5.
+- Partial payment and overdue: 74832df.
+- Explainable policy V2: 694e0fa.
+- Ledger, reconciliation, and audit: fa2aceb.
+- Final UI, documentation, and profile toggle behavior follow in a separate commit.
+
+The original MVP plan remains a historical record of the first implementation. The README describes the current system.

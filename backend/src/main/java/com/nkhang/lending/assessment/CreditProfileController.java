@@ -14,6 +14,10 @@ public class CreditProfileController {
     @PutMapping public ApiResponse<CreditProfileResponse> save(@Valid @RequestBody CreditProfileRequest request) {
         return ApiResponse.success(service.save(request));
     }
+    @DeleteMapping public ApiResponse<Void> delete() {
+        service.delete();
+        return ApiResponse.success(null);
+    }
     @GetMapping public ApiResponse<CreditProfileResponse> get() {
         return ApiResponse.success(service.get());
     }

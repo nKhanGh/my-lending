@@ -29,6 +29,15 @@ public class CreditProfileService {
         return CreditProfileResponse.from(profile);
     }
 
+    @Transactional
+    public void delete() {
+        var id = currentUser.id();
+        if (profiles.existsById(id)) {
+            profiles.deleteById(id);
+            audit.record(id, "PROFILE_REMOVED", "CREDIT_PROFILE", id, null);
+        }
+    }
+
     @Transactional(readOnly = true)
     public CreditProfileResponse get() {
         return profiles.findById(currentUser.id()).map(CreditProfileResponse::from)

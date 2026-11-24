@@ -104,6 +104,10 @@ class CreditLineFlowIntegrationTest extends PostgresIntegrationTest {
         assertEquals(2, rejected.missedPayments());
         profileService.save(new CreditProfileRequest(10, 0));
         assertEquals(2, applicationRepository.findById(rejected.applicationId()).orElseThrow().getMissedPayments());
+        profileService.delete();
+        assertEquals("DEMO_V1", applicationService.submit(new CreditApplicationRequest(
+                money("700.00"), money("400.00"), money("0.00"), null)).policyVersion());
+        profileService.save(new CreditProfileRequest(10, 0));
         var approved = approve();
         assertEquals("DEMO_V2", approved.policyVersion());
         assertEquals("APPROVED_TIER_1000", approved.reasonCode());
@@ -241,6 +245,30 @@ class CreditLineFlowIntegrationTest extends PostgresIntegrationTest {
         assertFalse(broken.matched());
         assertMoney("370.75", broken.accountUsed());
         assertMoney("369.75", broken.ledgerNet());
+    }
+
+    @Test
+    void simultaneousCallbacksRestorePrincipalOnce() throws Exception {
+        approve();
+        var drawdown = drawdownService.utilize(new DrawdownRequest(money("400.00")), "callback-draw");
+        var instalment = drawdownService.get(drawdown.drawdownId()).instalments().get(0);
+        var pending = repaymentService.repay(instalment.id(), "callback-payment");
+        var start = new CountDownLatch(1);
+        try (var executor = Executors.newFixedThreadPool(2)) {
+            var first = executor.submit(() -> {
+                start.await();
+                return repaymentService.settle(pending.repaymentId(), RepaymentTransaction.Status.SUCCESS, "same-event");
+            });
+            var second = executor.submit(() -> {
+                start.await();
+                return repaymentService.settle(pending.repaymentId(), RepaymentTransaction.Status.SUCCESS, "same-event");
+            });
+            start.countDown();
+            assertEquals(first.get(15, TimeUnit.SECONDS).repaymentId(),
+                    second.get(15, TimeUnit.SECONDS).repaymentId());
+        }
+        assertMoney("300.00", accountService.getAccount().usedLimit());
+        assertMoney("300.00", drawdownRepository.findById(drawdown.drawdownId()).orElseThrow().getOutstandingPrincipal());
     }
 
     @Test
