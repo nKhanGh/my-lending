@@ -1,7 +1,9 @@
+name: mini-lending-30h-mvp
+
 services:
   postgres:
     image: postgres:17-alpine
-    container_name: mini-lending-postgres
+    container_name: mini-lending-30h-postgres
     environment:
       POSTGRES_DB: ${DB_NAME:-lending}
       POSTGRES_USER: ${DB_USERNAME:-lending}
@@ -9,7 +11,7 @@ services:
     ports:
       - "${DB_PORT:-55432}:5432"
     volumes:
-      - lending-creditline-data:/var/lib/postgresql/data
+      - lending-mvp-data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
@@ -17,5 +19,5 @@ services:
       retries: 10
 
 volumes:
-  lending-creditline-data:
+  lending-mvp-data:
 
