@@ -16,4 +16,23 @@ public class DemoUser {
     @Id
     private UUID id;
     private String displayName;
+    private String email;
+    private String passwordHash;
+    @jakarta.persistence.Enumerated(jakarta.persistence.EnumType.STRING)
+    private UserRole role;
+
+    public static DemoUser customer(String displayName, String email, String passwordHash) {
+        DemoUser user = new DemoUser();
+        user.id = UUID.randomUUID();
+        user.displayName = displayName;
+        user.email = email;
+        user.passwordHash = passwordHash;
+        user.role = UserRole.CUSTOMER;
+        return user;
+    }
+
+    public void setDemoCredentials(String email, String passwordHash) {
+        this.email = email;
+        this.passwordHash = passwordHash;
+    }
 }

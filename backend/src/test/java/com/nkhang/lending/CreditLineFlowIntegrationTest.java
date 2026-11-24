@@ -15,10 +15,13 @@ import com.nkhang.lending.drawdown.dto.DrawdownRequest;
 import com.nkhang.lending.repayment.RepaymentService;
 import com.nkhang.lending.repayment.RepaymentTransactionRepository;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
@@ -32,6 +35,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -51,24 +55,34 @@ class CreditLineFlowIntegrationTest extends PostgresIntegrationTest {
     @Autowired RepaymentTransactionRepository repaymentRepository;
     @Autowired JdbcTemplate jdbc;
 
+    private static final String DEMO_ID = "00000000-0000-0000-0000-000000000001";
+
+    private void authenticate() {
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(DEMO_ID, null, java.util.List.of()));
+    }
+
+    @AfterEach void clearSecurity() { SecurityContextHolder.clearContext(); }
+
     @BeforeEach
     void reset() {
+        authenticate();
         jdbc.execute("TRUNCATE TABLE credit_applications, credit_accounts CASCADE");
     }
 
     @Test
     void httpAssessmentAndAccountContract() throws Exception {
-        mockMvc.perform(post("/api/credit-applications")
+        mockMvc.perform(post("/api/credit-applications").with(jwt().jwt(token -> token.subject(DEMO_ID)))
                         .contentType("application/json")
                         .content("{\"monthlyNetIncome\":-1,\"monthlyLivingExpenses\":0,\"monthlyDebtPayments\":0}"))
                 .andExpect(status().isBadRequest());
-        mockMvc.perform(post("/api/credit-applications")
+        mockMvc.perform(post("/api/credit-applications").with(jwt().jwt(token -> token.subject(DEMO_ID)))
                         .contentType("application/json")
                         .content("{\"monthlyNetIncome\":3000,\"monthlyLivingExpenses\":1400,\"monthlyDebtPayments\":500}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.result.decision").value("APPROVED"))
                 .andExpect(jsonPath("$.result.approvedLimit").value(1000));
-        mockMvc.perform(get("/api/credit-account"))
+        mockMvc.perform(get("/api/credit-account").with(jwt().jwt(token -> token.subject(DEMO_ID))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.result.availableLimit").value(1000));
     }
@@ -171,6 +185,7 @@ class CreditLineFlowIntegrationTest extends PostgresIntegrationTest {
         ready.countDown();
         start.await();
         try {
+            authenticate();
             drawdownService.utilize(new DrawdownRequest(money("700.00")), key);
             return true;
         } catch (AppException exception) {

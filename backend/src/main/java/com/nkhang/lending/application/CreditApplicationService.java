@@ -7,8 +7,8 @@ import com.nkhang.lending.common.exception.AppException;
 import com.nkhang.lending.common.exception.ErrorCode;
 import com.nkhang.lending.creditaccount.CreditAccount;
 import com.nkhang.lending.creditaccount.CreditAccountRepository;
+import com.nkhang.lending.config.CurrentUser;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,18 +24,17 @@ public class CreditApplicationService {
     private final CreditAccountRepository accountRepository;
     private final CreditAssessmentPolicy policy;
     private final Clock clock;
-
-    @Value("${lending.demo-user-id}")
-    private UUID demoUserId;
+    private final CurrentUser currentUser;
 
     @Transactional
     public CreditApplicationResponse submit(CreditApplicationRequest request) {
         if (request.currency() != null && !"SGD".equals(request.currency())) {
             throw new AppException(ErrorCode.INVALID_REQUEST, "Only SGD is supported in this demo");
         }
-        userRepository.lockById(demoUserId)
-                .orElseThrow(() -> new AppException(ErrorCode.RESOURCE_NOT_FOUND, "Demo user not found"));
-        if (accountRepository.findByUserId(demoUserId).isPresent()) {
+        UUID userId = currentUser.id();
+        userRepository.lockById(userId)
+                .orElseThrow(() -> new AppException(ErrorCode.RESOURCE_NOT_FOUND, "User not found"));
+        if (accountRepository.findByUserId(userId).isPresent()) {
             throw new AppException(ErrorCode.APPLICATION_ALREADY_APPROVED);
         }
 
@@ -43,18 +42,18 @@ public class CreditApplicationService {
                 .subtract(request.monthlyLivingExpenses())
                 .subtract(request.monthlyDebtPayments());
         var decision = policy.assess(surplus);
-        var application = applicationRepository.save(new CreditApplication(demoUserId,
+        var application = applicationRepository.save(new CreditApplication(userId,
                 request.monthlyNetIncome(), request.monthlyLivingExpenses(), request.monthlyDebtPayments(),
                 surplus, decision.status(), decision.reasonCode(), decision.limit(), Instant.now(clock)));
         if (decision.status() == CreditApplication.Status.APPROVED) {
-            accountRepository.save(new CreditAccount(demoUserId, decision.limit()));
+            accountRepository.save(new CreditAccount(userId, decision.limit()));
         }
         return CreditApplicationResponse.from(application);
     }
 
     @Transactional(readOnly = true)
     public CreditApplicationResponse latest() {
-        return applicationRepository.findFirstByUserIdOrderByAssessedAtDesc(demoUserId)
+        return applicationRepository.findFirstByUserIdOrderByAssessedAtDesc(currentUser.id())
                 .map(CreditApplicationResponse::from)
                 .orElseThrow(() -> new AppException(ErrorCode.RESOURCE_NOT_FOUND, "No credit application yet"));
     }

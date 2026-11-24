@@ -22,15 +22,17 @@ public class RepaymentTransaction {
     @Id
     private UUID id;
     private UUID instalmentId;
+    private UUID userId;
     private BigDecimal amount;
     @Enumerated(EnumType.STRING)
     private Status status;
     private Instant paidAt;
     private String idempotencyKey;
 
-    public RepaymentTransaction(UUID instalmentId, BigDecimal amount, Instant paidAt, String idempotencyKey) {
+    public RepaymentTransaction(UUID userId, UUID instalmentId, BigDecimal amount, Instant paidAt, String idempotencyKey) {
         this.id = UUID.randomUUID();
         this.instalmentId = instalmentId;
+        this.userId = userId;
         this.amount = amount;
         this.status = Status.SUCCESS;
         this.paidAt = paidAt;

@@ -45,7 +45,7 @@ public class RepaymentService {
         // Both entities may have been read before waiting for the account row lock.
         entityManager.refresh(instalment);
         entityManager.refresh(drawdown);
-        var existing = repaymentRepository.findByIdempotencyKey(key);
+        var existing = repaymentRepository.findByUserIdAndIdempotencyKey(account.getUserId(), key);
         if (existing.isPresent()) {
             var repayment = existing.get();
             if (!repayment.getInstalmentId().equals(instalmentId)) {
@@ -62,7 +62,7 @@ public class RepaymentService {
         }
 
         Instant now = Instant.now(clock);
-        var repayment = repaymentRepository.save(new RepaymentTransaction(instalmentId,
+        var repayment = repaymentRepository.save(new RepaymentTransaction(account.getUserId(), instalmentId,
                 instalment.getAmount(), now, key));
         instalment.markPaid(now);
         drawdown.repay(instalment.getAmount());

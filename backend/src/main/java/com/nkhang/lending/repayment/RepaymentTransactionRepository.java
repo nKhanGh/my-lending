@@ -7,6 +7,6 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface RepaymentTransactionRepository extends JpaRepository<RepaymentTransaction, UUID> {
-    Optional<RepaymentTransaction> findByIdempotencyKey(String idempotencyKey);
+    Optional<RepaymentTransaction> findByUserIdAndIdempotencyKey(UUID userId, String idempotencyKey);
     List<RepaymentTransaction> findByInstalmentIdInOrderByPaidAt(List<UUID> instalmentIds);
 }
