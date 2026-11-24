@@ -16,6 +16,8 @@ public enum ErrorCode {
     EMAIL_ALREADY_EXISTS(40905, "Email already registered", HttpStatus.CONFLICT),
     INVALID_CREDENTIALS(40101, "Invalid email or password", HttpStatus.UNAUTHORIZED),
     UNAUTHENTICATED(40102, "Authentication required", HttpStatus.UNAUTHORIZED),
+    PAYMENT_ALREADY_PENDING(40906, "Payment already pending", HttpStatus.CONFLICT),
+    PAYMENT_ALREADY_RESOLVED(40907, "Payment already resolved", HttpStatus.CONFLICT),
     INTERNAL_SERVER_ERROR(50000, "An unexpected error occurred", HttpStatus.INTERNAL_SERVER_ERROR);
 
     private final int code;

@@ -1,13 +1,8 @@
 package com.nkhang.lending.repayment;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
@@ -17,25 +12,31 @@ import java.util.UUID;
 @Getter
 @NoArgsConstructor
 public class RepaymentTransaction {
-    public enum Status { SUCCESS }
-
-    @Id
-    private UUID id;
-    private UUID instalmentId;
+    public enum Status { PENDING, SUCCESS, FAILED }
+    @Id private UUID id;
     private UUID userId;
+    private UUID instalmentId;
     private BigDecimal amount;
-    @Enumerated(EnumType.STRING)
-    private Status status;
+    @Enumerated(EnumType.STRING) private Status status;
+    private Instant requestedAt;
     private Instant paidAt;
+    private String providerEventId;
     private String idempotencyKey;
 
-    public RepaymentTransaction(UUID userId, UUID instalmentId, BigDecimal amount, Instant paidAt, String idempotencyKey) {
-        this.id = UUID.randomUUID();
-        this.instalmentId = instalmentId;
+    public RepaymentTransaction(UUID userId, UUID instalmentId, BigDecimal amount, Instant now, String key) {
+        id = UUID.randomUUID();
         this.userId = userId;
+        this.instalmentId = instalmentId;
         this.amount = amount;
-        this.status = Status.SUCCESS;
-        this.paidAt = paidAt;
-        this.idempotencyKey = idempotencyKey;
+        status = Status.PENDING;
+        requestedAt = now;
+        idempotencyKey = key;
+    }
+
+    public void resolve(Status outcome, String eventId, Instant now) {
+        if (status != Status.PENDING || outcome == Status.PENDING) throw new IllegalStateException("Invalid payment transition");
+        status = outcome;
+        providerEventId = eventId;
+        paidAt = now;
     }
 }

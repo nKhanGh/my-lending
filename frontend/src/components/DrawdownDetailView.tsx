@@ -192,10 +192,20 @@ export function DrawdownDetailView({
                   )?.sequenceNo ?? "?"}
                 </strong>
                 <small>
-                  {fullDate(item.paidAt)} · {shortId(item.id)}
+                  {item.status === "PENDING"
+                    ? "Đang xử lý"
+                    : item.status === "FAILED"
+                      ? "Thất bại"
+                      : item.paidAt
+                        ? fullDate(item.paidAt)
+                        : ""}{" "}
+                  · {shortId(item.id)}
                 </small>
               </span>
-              <strong>−{currency(item.amount)}</strong>
+              <strong>
+                {item.status === "SUCCESS" ? "−" : ""}
+                {currency(item.amount)}
+              </strong>
             </div>
           ))}
         </div>

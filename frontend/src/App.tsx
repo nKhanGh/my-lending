@@ -18,9 +18,12 @@ import {
   clearIdempotencyKey,
   idempotencyKey,
   optional,
+  getAuthSession,
+  setAuthSession,
 } from "./lib/api";
 import type {
   ApplicationInput,
+  AuthSession,
   CreditAccount,
   CreditApplication,
   Drawdown,
@@ -32,6 +35,7 @@ import { HomeView } from "./components/HomeView";
 import { FacilityView } from "./components/FacilityView";
 import { DrawdownsView } from "./components/DrawdownsView";
 import { DrawdownDetailView } from "./components/DrawdownDetailView";
+import { AuthView } from "./components/AuthView";
 import styles from "./App.module.css";
 
 type Page = "overview" | "facility" | "drawdowns" | "assessment" | "detail";
@@ -43,6 +47,7 @@ const navigation = [
 ] as const;
 
 export default function App() {
+  const [session, setSession] = useState<AuthSession | null>(getAuthSession);
   const [page, setPage] = useState<Page>("overview");
   const [application, setApplication] = useState<CreditApplication | null>(
     null,
@@ -71,6 +76,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (!session) return;
     let active = true;
     refresh()
       .then((nextAccount) => {
@@ -85,7 +91,7 @@ export default function App() {
     return () => {
       active = false;
     };
-  }, [refresh]);
+  }, [refresh, session]);
 
   function navigate(next: Page) {
     setPage(next === "overview" && !account ? "assessment" : next);
@@ -157,7 +163,25 @@ export default function App() {
     setBusy(true);
     setError("");
     try {
-      await api.repay(instalmentId, idempotencyKey(action));
+      const requested = await api.repay(instalmentId, idempotencyKey(action));
+      setNotice("Yêu cầu đã gửi. Đang chờ kết quả thanh toán…");
+      let outcome = requested;
+      for (let poll = 0; poll < 30 && outcome.status === "PENDING"; poll++) {
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        outcome = await api.payment(requested.repaymentId);
+      }
+      if (outcome.status === "PENDING") {
+        setNotice(
+          "Thanh toán vẫn đang xử lý. Tải lại trang để kiểm tra, hoặc thử lại với cùng yêu cầu.",
+        );
+        return;
+      }
+      clearIdempotencyKey(action);
+      if (outcome.status === "FAILED") {
+        setNotice("");
+        setError("Thanh toán thất bại. Bạn có thể thử lại.");
+        return;
+      }
       const id = detail.drawdownId;
       await refresh();
       const [nextDetail, nextRepayments] = await Promise.all([
@@ -166,7 +190,6 @@ export default function App() {
       ]);
       setDetail(nextDetail);
       setRepayments(nextRepayments);
-      clearIdempotencyKey(action);
       setNotice(
         nextDetail.status === "PAID_OFF"
           ? "Khoản sử dụng đã được tất toán."
@@ -200,6 +223,29 @@ export default function App() {
       setLoading(false);
     }
   }
+
+  function logout() {
+    setAuthSession(null);
+    setSession(null);
+    setApplication(null);
+    setAccount(null);
+    setDrawdowns([]);
+    setDetail(null);
+    setRepayments([]);
+    setError("");
+    setNotice("");
+  }
+
+  if (!session)
+    return (
+      <AuthView
+        onAuthenticated={(value) => {
+          setAuthSession(value);
+          setSession(value);
+          setLoading(true);
+        }}
+      />
+    );
 
   const activeNav = page === "detail" ? "drawdowns" : page;
   const pageLabel =
@@ -251,9 +297,11 @@ export default function App() {
             <p>Một hạn mức rõ ràng, từng bước tiến vững vàng.</p>
           </div>
           <div className={styles.sideIdentity}>
-            <span className={styles.identityAvatar}>D</span>
+            <span className={styles.identityAvatar}>
+              {session.displayName.charAt(0).toUpperCase()}
+            </span>
             <span>
-              <strong>Demo account</strong>
+              <strong>{session.displayName}</strong>
               <small>Personal space</small>
             </span>
             <span className={styles.onlineDot} />
@@ -289,7 +337,13 @@ export default function App() {
               <RefreshCw size={18} />
             </button>
             <span className={styles.headerDivider} />
-            <span className={styles.headerAvatar}>D</span>
+            <button
+              className={styles.authLogout}
+              onClick={logout}
+              title="Đăng xuất"
+            >
+              Đăng xuất
+            </button>
           </div>
         </header>
         <main className={styles.main}>

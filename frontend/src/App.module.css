@@ -1957,3 +1957,143 @@
     font-size: 9px;
   }
 }
+
+.authPage {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 1.05fr 1fr;
+  background: #f6f5f1;
+}
+.authIntro {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 9vw 8vw;
+  background: #193a32;
+  color: #f7f3e9;
+}
+.authIntro .logoMark {
+  width: 52px;
+  height: 52px;
+  font-size: 34px;
+  margin-bottom: 60px;
+}
+.authEyebrow {
+  font-size: 11px;
+  letter-spacing: 3px;
+  color: #d7bd8f;
+  font-weight: 800;
+}
+.authIntro h1 {
+  max-width: 590px;
+  font:
+    400 clamp(44px, 5vw, 76px) / 1.1 "Playfair Display",
+    Georgia,
+    serif;
+  margin: 20px 0;
+}
+.authIntro h1 em {
+  color: #dec396;
+}
+.authIntro p {
+  max-width: 440px;
+  line-height: 1.9;
+  color: #c2d0c9;
+}
+.authFoot {
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #a9bfb3;
+  font-size: 12px;
+}
+.authCard {
+  align-self: center;
+  justify-self: center;
+  width: min(440px, 82%);
+  display: flex;
+  flex-direction: column;
+  gap: 17px;
+}
+.authCard h2 {
+  font:
+    400 46px "Playfair Display",
+    Georgia,
+    serif;
+  color: #20332f;
+  margin: 0;
+}
+.authCard p {
+  margin: 0 0 16px;
+  color: #858f88;
+}
+.authCard label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #455c52;
+}
+.authCard input {
+  height: 48px;
+  border: 1px solid #d9ddd5;
+  border-radius: 9px;
+  background: #fff;
+  padding: 0 14px;
+  font: inherit;
+  color: #20332f;
+}
+.authCard input:focus {
+  outline: 2px solid #b8a076;
+  outline-offset: 1px;
+}
+.authCard .goldButton {
+  justify-content: center;
+  margin-top: 12px;
+}
+.authSwitch,
+.authLogout {
+  border: 0;
+  background: transparent;
+  color: #7d6b50;
+  cursor: pointer;
+  font-weight: 700;
+}
+.authSwitch {
+  align-self: center;
+  font-size: 12px;
+  padding: 12px;
+}
+.authLogout {
+  font-size: 12px;
+}
+.authError {
+  color: #a44038;
+  background: #fff0ed;
+  padding: 12px;
+  border-radius: 8px;
+  font-size: 12px;
+}
+@media (max-width: 800px) {
+  .authPage {
+    grid-template-columns: 1fr;
+  }
+  .authIntro {
+    padding: 40px 8vw 50px;
+  }
+  .authIntro .logoMark {
+    margin-bottom: 32px;
+  }
+  .authIntro h1 {
+    font-size: 42px;
+  }
+  .authFoot {
+    margin-top: 24px;
+  }
+  .authCard {
+    padding: 60px 0;
+  }
+}

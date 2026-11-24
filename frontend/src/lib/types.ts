@@ -5,6 +5,13 @@ export interface ApiResponse<T> {
   timestamp: string;
 }
 
+export interface AuthSession {
+  accessToken: string;
+  userId: string;
+  displayName: string;
+  role: string;
+}
+
 export interface CreditApplication {
   applicationId: string;
   decision: "APPROVED" | "REJECTED";
@@ -49,18 +56,21 @@ export interface DrawdownDetail extends Drawdown {
 
 export interface Repayment {
   repaymentId: string;
-  paidAmount: number;
+  amount: number;
+  status: "PENDING" | "SUCCESS" | "FAILED";
+  requestedAt: string;
+  resolvedAt: string | null;
   remainingDrawdownPrincipal: number;
   availableLimit: number;
-  instalmentStatus: "PAID";
 }
 
 export interface RepaymentHistory {
   id: string;
   instalmentId: string;
   amount: number;
-  status: "SUCCESS";
-  paidAt: string;
+  status: "PENDING" | "SUCCESS" | "FAILED";
+  requestedAt: string;
+  paidAt: string | null;
 }
 
 export interface ApplicationInput {

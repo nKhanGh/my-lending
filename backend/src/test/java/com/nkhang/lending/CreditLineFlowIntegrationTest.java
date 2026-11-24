@@ -13,6 +13,7 @@ import com.nkhang.lending.drawdown.CreditDrawdownService;
 import com.nkhang.lending.drawdown.InstalmentRepository;
 import com.nkhang.lending.drawdown.dto.DrawdownRequest;
 import com.nkhang.lending.repayment.RepaymentService;
+import com.nkhang.lending.repayment.RepaymentTransaction;
 import com.nkhang.lending.repayment.RepaymentTransactionRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.AfterEach;
@@ -134,18 +135,28 @@ class CreditLineFlowIntegrationTest extends PostgresIntegrationTest {
         var first = repaymentService.repay(schedule.get(0).id(), "repay-1");
         var retry = repaymentService.repay(schedule.get(0).id(), "repay-1");
         assertEquals(first.repaymentId(), retry.repaymentId());
-        assertMoney("600.00", first.remainingDrawdownPrincipal());
-        assertMoney("400.00", first.availableLimit());
+        assertEquals(RepaymentTransaction.Status.PENDING, first.status());
+        assertMoney("800.00", first.remainingDrawdownPrincipal());
+        assertMoney("200.00", first.availableLimit());
         assertEquals(1, repaymentRepository.count());
-        assertEquals(ErrorCode.INVALID_REPAYMENT_STATE,
+        assertEquals(ErrorCode.PAYMENT_ALREADY_PENDING,
                 assertThrows(AppException.class, () -> repaymentService.repay(schedule.get(0).id(), "another-key"))
                         .getErrorCode());
         assertEquals(ErrorCode.IDEMPOTENCY_KEY_REUSED,
                 assertThrows(AppException.class, () -> repaymentService.repay(schedule.get(1).id(), "repay-1"))
                         .getErrorCode());
 
+        var settled = repaymentService.settle(first.repaymentId(), RepaymentTransaction.Status.SUCCESS, "provider-1");
+        assertMoney("600.00", settled.remainingDrawdownPrincipal());
+        assertMoney("400.00", settled.availableLimit());
+        var duplicate = repaymentService.settle(first.repaymentId(), RepaymentTransaction.Status.SUCCESS, "provider-1");
+        assertMoney("600.00", duplicate.remainingDrawdownPrincipal());
+        assertEquals(ErrorCode.PAYMENT_ALREADY_RESOLVED,
+                assertThrows(AppException.class, () -> repaymentService.settle(first.repaymentId(),
+                        RepaymentTransaction.Status.FAILED, "late-failure")).getErrorCode());
         for (int i = 1; i < 4; i++) {
-            repaymentService.repay(schedule.get(i).id(), "repay-" + (i + 1));
+            var attempt = repaymentService.repay(schedule.get(i).id(), "repay-" + (i + 1));
+            repaymentService.settle(attempt.repaymentId(), RepaymentTransaction.Status.SUCCESS, "provider-" + (i + 1));
         }
         var closed = drawdownRepository.findById(drawdown.drawdownId()).orElseThrow();
         assertEquals(CreditDrawdown.Status.PAID_OFF, closed.getStatus());
@@ -153,6 +164,21 @@ class CreditLineFlowIntegrationTest extends PostgresIntegrationTest {
         assertMoney("0.00", accountService.getAccount().usedLimit());
         assertMoney("1000.00", accountService.getAccount().availableLimit());
         assertEquals(4, repaymentService.history(drawdown.drawdownId()).size());
+    }
+
+    @Test
+    void failedPaymentDoesNotChangeBalanceAndCanBeRetried() {
+        approve();
+        var drawdown = drawdownService.utilize(new DrawdownRequest(money("400.00")), "draw-fail");
+        var instalment = drawdownService.get(drawdown.drawdownId()).instalments().get(0);
+        var attempt = repaymentService.repay(instalment.id(), "failed-first");
+        var failed = repaymentService.settle(attempt.repaymentId(), RepaymentTransaction.Status.FAILED, "provider-failed");
+        assertEquals(RepaymentTransaction.Status.FAILED, failed.status());
+        assertMoney("400.00", accountService.getAccount().usedLimit());
+        var retry = repaymentService.repay(instalment.id(), "new-key-after-failure");
+        assertNotEquals(attempt.repaymentId(), retry.repaymentId());
+        repaymentService.settle(retry.repaymentId(), RepaymentTransaction.Status.SUCCESS, "provider-success");
+        assertMoney("300.00", accountService.getAccount().usedLimit());
     }
 
     @Test

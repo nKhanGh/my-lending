@@ -1,6 +1,7 @@
 import axios, { AxiosError } from "axios";
 import type {
   ApiResponse,
+  AuthSession,
   ApplicationInput,
   CreditAccount,
   CreditApplication,
@@ -24,6 +25,12 @@ const client = axios.create({
   baseURL: "/api",
   timeout: 15000,
   headers: { Accept: "application/json" },
+});
+
+client.interceptors.request.use((config) => {
+  const session = getAuthSession();
+  if (session) config.headers.Authorization = `Bearer ${session.accessToken}`;
+  return config;
 });
 
 client.interceptors.response.use(
@@ -60,7 +67,26 @@ export async function optional<T>(request: Promise<T>): Promise<T | null> {
   }
 }
 
+const SESSION_KEY = "mini-lending:session";
+export function getAuthSession(): AuthSession | null {
+  try {
+    const saved = sessionStorage.getItem(SESSION_KEY);
+    return saved ? (JSON.parse(saved) as AuthSession) : null;
+  } catch {
+    return null;
+  }
+}
+export function setAuthSession(session: AuthSession | null): void {
+  if (session) sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
+  else sessionStorage.removeItem(SESSION_KEY);
+}
+
 export const api = {
+  login: (email: string, password: string) =>
+    post<AuthSession>("/auth/login", { email, password }),
+  register: (displayName: string, email: string, password: string) =>
+    post<AuthSession>("/auth/register", { displayName, email, password }),
+  payment: (id: string) => get<Repayment>(`/payments/${id}`),
   latestApplication: () =>
     get<CreditApplication>("/credit-applications/latest"),
   submitApplication: (body: ApplicationInput) =>
@@ -77,7 +103,7 @@ export const api = {
 };
 
 export function idempotencyKey(action: string): string {
-  const storageKey = `mini-lending:${action}`;
+  const storageKey = `mini-lending:${getAuthSession()?.userId ?? "anonymous"}:${action}`;
   const existing = sessionStorage.getItem(storageKey);
   if (existing) return existing;
   const key = crypto.randomUUID();
@@ -86,5 +112,7 @@ export function idempotencyKey(action: string): string {
 }
 
 export function clearIdempotencyKey(action: string): void {
-  sessionStorage.removeItem(`mini-lending:${action}`);
+  sessionStorage.removeItem(
+    `mini-lending:${getAuthSession()?.userId ?? "anonymous"}:${action}`,
+  );
 }
