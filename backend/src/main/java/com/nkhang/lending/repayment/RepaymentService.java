@@ -4,6 +4,8 @@ import com.nkhang.lending.common.exception.AppException;
 import com.nkhang.lending.common.exception.ErrorCode;
 import com.nkhang.lending.common.idempotency.IdempotencyKeys;
 import com.nkhang.lending.creditaccount.CreditAccountRepository;
+import com.nkhang.lending.ledger.LedgerService;
+import com.nkhang.lending.audit.AuditService;
 import com.nkhang.lending.creditaccount.CreditAccountService;
 import com.nkhang.lending.drawdown.*;
 import com.nkhang.lending.repayment.dto.RepaymentHistoryResponse;
@@ -28,6 +30,8 @@ public class RepaymentService {
     private final RepaymentTransactionRepository repayments;
     private final EntityManager entityManager;
     private final Clock clock;
+    private final LedgerService ledger;
+    private final AuditService audit;
 
     @Transactional
     public RepaymentResponse repay(UUID instalmentId, String rawKey) {
@@ -69,6 +73,8 @@ public class RepaymentService {
         }
         var payment = repayments.save(new RepaymentTransaction(account.getUserId(), instalmentId,
                 amount, Instant.now(clock), key));
+        audit.record(account.getUserId(), "PAYMENT_REQUESTED", "REPAYMENT", payment.getId(),
+                "amount=" + amount.toPlainString());
         return RepaymentResponse.from(payment, drawdown.getOutstandingPrincipal(), account.getAvailableLimit());
     }
 
@@ -103,8 +109,12 @@ public class RepaymentService {
             instalment.applyPayment(candidate.getAmount(), now);
             drawdown.repay(candidate.getAmount());
             account.restore(candidate.getAmount());
+            ledger.repayment(account.getUserId(), account.getId(), drawdown.getId(), candidate.getId(),
+                    candidate.getAmount());
         }
         candidate.resolve(outcome, eventId, now);
+        audit.record(account.getUserId(), "PAYMENT_" + outcome.name(), "REPAYMENT", candidate.getId(),
+                "event=" + eventId);
         return RepaymentResponse.from(candidate, drawdown.getOutstandingPrincipal(), account.getAvailableLimit());
     }
 

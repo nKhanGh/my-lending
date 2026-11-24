@@ -31,6 +31,12 @@ public class DemoUser {
         return user;
     }
 
+    public static DemoUser admin(String displayName, String email, String passwordHash) {
+        DemoUser user = customer(displayName, email, passwordHash);
+        user.role = UserRole.ADMIN;
+        return user;
+    }
+
     public void setDemoCredentials(String email, String passwordHash) {
         this.email = email;
         this.passwordHash = passwordHash;

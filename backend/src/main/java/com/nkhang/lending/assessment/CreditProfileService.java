@@ -4,6 +4,7 @@ import com.nkhang.lending.assessment.dto.*;
 import com.nkhang.lending.common.exception.AppException;
 import com.nkhang.lending.common.exception.ErrorCode;
 import com.nkhang.lending.config.CurrentUser;
+import com.nkhang.lending.audit.AuditService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,6 +16,7 @@ public class CreditProfileService {
     private final CreditProfileRepository profiles;
     private final CurrentUser currentUser;
     private final Clock clock;
+    private final AuditService audit;
 
     @Transactional
     public CreditProfileResponse save(CreditProfileRequest request) {
@@ -22,7 +24,9 @@ public class CreditProfileService {
         var profile = profiles.findById(id).orElseGet(
                 () -> new CreditProfile(id, request.onTimePayments(), request.missedPayments(), clock.instant()));
         profile.update(request.onTimePayments(), request.missedPayments(), clock.instant());
-        return CreditProfileResponse.from(profiles.save(profile));
+        profiles.save(profile);
+        audit.record(id, "PROFILE_UPDATED", "CREDIT_PROFILE", id, null);
+        return CreditProfileResponse.from(profile);
     }
 
     @Transactional(readOnly = true)

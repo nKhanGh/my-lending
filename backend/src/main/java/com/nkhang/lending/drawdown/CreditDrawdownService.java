@@ -4,10 +4,13 @@ import com.nkhang.lending.common.exception.AppException;
 import com.nkhang.lending.common.exception.ErrorCode;
 import com.nkhang.lending.common.idempotency.IdempotencyKeys;
 import com.nkhang.lending.creditaccount.CreditAccountService;
+import com.nkhang.lending.ledger.LedgerService;
+import com.nkhang.lending.audit.AuditService;
 import com.nkhang.lending.drawdown.dto.DrawdownDetailResponse;
 import com.nkhang.lending.drawdown.dto.DrawdownRequest;
 import com.nkhang.lending.drawdown.dto.DrawdownResponse;
 import com.nkhang.lending.drawdown.dto.InstalmentResponse;
+import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,6 +29,9 @@ public class CreditDrawdownService {
     private final InstalmentRepository instalmentRepository;
     private final InstalmentScheduleFactory scheduleFactory;
     private final Clock clock;
+    private final LedgerService ledger;
+    private final AuditService audit;
+    private final EntityManager entityManager;
 
     @Transactional
     public DrawdownResponse utilize(DrawdownRequest request, String rawKey) {
@@ -46,6 +52,10 @@ public class CreditDrawdownService {
         var instalments = scheduleFactory.create(drawdown.getId(), request.amount(),
                 LocalDate.ofInstant(now, clock.getZone()));
         instalmentRepository.saveAll(instalments);
+        entityManager.flush();
+        ledger.drawdown(account.getUserId(), account.getId(), drawdown.getId(), request.amount());
+        audit.record(account.getUserId(), "DRAWDOWN_CREATED", "CREDIT_DRAWDOWN", drawdown.getId(),
+                "amount=" + request.amount().toPlainString());
         return DrawdownResponse.from(drawdown, account.getAvailableLimit());
     }
 

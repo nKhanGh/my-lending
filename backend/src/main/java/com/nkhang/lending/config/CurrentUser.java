@@ -9,6 +9,10 @@ import java.util.UUID;
 
 @Component
 public class CurrentUser {
+    public UUID optionalId() {
+        try { return id(); } catch (AppException ignored) { return null; }
+    }
+
     public UUID id() {
         var authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !authentication.isAuthenticated()) {

@@ -16,6 +16,8 @@ import com.nkhang.lending.drawdown.InstalmentRepository;
 import com.nkhang.lending.drawdown.dto.DrawdownRequest;
 import com.nkhang.lending.repayment.RepaymentService;
 import com.nkhang.lending.repayment.RepaymentTransaction;
+import com.nkhang.lending.ledger.ReconciliationService;
+import com.nkhang.lending.audit.AuditService;
 import com.nkhang.lending.repayment.RepaymentTransactionRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.AfterEach;
@@ -58,6 +60,8 @@ class CreditLineFlowIntegrationTest extends PostgresIntegrationTest {
     @Autowired RepaymentService repaymentService;
     @Autowired RepaymentTransactionRepository repaymentRepository;
     @Autowired JdbcTemplate jdbc;
+    @Autowired ReconciliationService reconciliation;
+    @Autowired AuditService audit;
 
     private static final String DEMO_ID = "00000000-0000-0000-0000-000000000001";
 
@@ -216,6 +220,27 @@ class CreditLineFlowIntegrationTest extends PostgresIntegrationTest {
         repaymentService.settle(rest.repaymentId(), RepaymentTransaction.Status.SUCCESS, "part-event-2");
         assertMoney("300.00", accountService.getAccount().usedLimit());
         assertEquals(2, repaymentService.history(drawdown.drawdownId()).size());
+    }
+
+    @Test
+    void ledgerReconcilesAndDetectsTamperingWithAuditTrail() {
+        approve();
+        var drawdown = drawdownService.utilize(new DrawdownRequest(money("400.00")), "ledger-draw");
+        var first = drawdownService.get(drawdown.drawdownId()).instalments().get(0);
+        var payment = repaymentService.repay(first.id(), "ledger-pay", money("30.25"));
+        repaymentService.settle(payment.repaymentId(), RepaymentTransaction.Status.SUCCESS, "ledger-provider");
+        var accountId = accountService.getAccount().accountId();
+        var actual = reconciliation.all().stream().filter(row -> row.accountId().equals(accountId))
+                .findFirst().orElseThrow();
+        assertTrue(actual.matched());
+        assertMoney("369.75", actual.ledgerNet());
+        assertTrue(audit.own().stream().anyMatch(event -> event.action().equals("PAYMENT_SUCCESS")));
+        jdbc.update("UPDATE credit_accounts SET used_limit = used_limit + 1 WHERE id=?", accountId);
+        var broken = reconciliation.all().stream().filter(row -> row.accountId().equals(accountId))
+                .findFirst().orElseThrow();
+        assertFalse(broken.matched());
+        assertMoney("370.75", broken.accountUsed());
+        assertMoney("369.75", broken.ledgerNet());
     }
 
     @Test

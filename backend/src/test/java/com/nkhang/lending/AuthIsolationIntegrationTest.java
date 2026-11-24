@@ -51,5 +51,7 @@ class AuthIsolationIntegrationTest extends PostgresIntegrationTest {
         mvc.perform(post("/api/instalments/" + instalmentId + "/repay").header("Authorization", secondToken)
                 .header("Idempotency-Key", "cross-account-repay")).andExpect(status().isNotFound());
         mvc.perform(get("/api/credit-account")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/admin/reconciliation").header("Authorization", firstToken))
+                .andExpect(status().isForbidden());
     }
 }

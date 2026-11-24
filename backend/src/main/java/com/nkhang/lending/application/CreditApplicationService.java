@@ -9,6 +9,7 @@ import com.nkhang.lending.common.exception.ErrorCode;
 import com.nkhang.lending.creditaccount.CreditAccount;
 import com.nkhang.lending.creditaccount.CreditAccountRepository;
 import com.nkhang.lending.config.CurrentUser;
+import com.nkhang.lending.audit.AuditService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,6 +28,7 @@ public class CreditApplicationService {
     private final CreditProfileRepository profiles;
     private final Clock clock;
     private final CurrentUser currentUser;
+    private final AuditService audit;
 
     @Transactional
     public CreditApplicationResponse submit(CreditApplicationRequest request) {
@@ -57,8 +59,11 @@ public class CreditApplicationService {
                     explained.orElseThrow().debtToIncomeRatio());
         }
         applicationRepository.save(application);
+        audit.record(userId, "APPLICATION_" + decision.status(), "CREDIT_APPLICATION",
+                application.getId(), decision.reasonCode());
         if (decision.status() == CreditApplication.Status.APPROVED) {
-            accountRepository.save(new CreditAccount(userId, decision.limit()));
+            var account = accountRepository.save(new CreditAccount(userId, decision.limit()));
+            audit.record(userId, "ACCOUNT_OPENED", "CREDIT_ACCOUNT", account.getId(), null);
         }
         return CreditApplicationResponse.from(application);
     }
