@@ -185,7 +185,12 @@ export function DrawdownDetailView({
                 <Check size={17} />
               </span>
               <span>
-                <strong>Thanh toán kỳ {detail.instalments.find((instalment) => instalment.id === item.instalmentId)?.sequenceNo ?? "?"}</strong>
+                <strong>
+                  Thanh toán kỳ{" "}
+                  {detail.instalments.find(
+                    (instalment) => instalment.id === item.instalmentId,
+                  )?.sequenceNo ?? "?"}
+                </strong>
                 <small>
                   {fullDate(item.paidAt)} · {shortId(item.id)}
                 </small>

@@ -1,7 +1,9 @@
 export const currency = (value: number) =>
-  new Intl.NumberFormat("en-SG", { style: "currency", currency: "SGD", currencyDisplay: "code" }).format(
-    value,
-  );
+  new Intl.NumberFormat("en-SG", {
+    style: "currency",
+    currency: "SGD",
+    currencyDisplay: "code",
+  }).format(value);
 
 export const compactCurrency = (value: number) =>
   new Intl.NumberFormat("en-SG", { maximumFractionDigits: 0 }).format(value);

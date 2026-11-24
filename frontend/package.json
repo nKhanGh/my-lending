@@ -7,8 +7,8 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "format": "prettier --write src index.html vite.config.ts tsconfig.json package.json README.md",
-    "format:check": "prettier --check src index.html vite.config.ts tsconfig.json package.json README.md"
+    "format": "prettier --write src index.html vite.config.ts tsconfig.json package.json ../README.md",
+    "format:check": "prettier --check src index.html vite.config.ts tsconfig.json package.json ../README.md"
   },
   "dependencies": {
     "axios": "^1.13.5",

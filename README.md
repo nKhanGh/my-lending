@@ -51,21 +51,26 @@ The system rejects a drawdown above the available limit. A concurrent limit test
 
 Success and error bodies use the `ApiResponse<T>` envelope, with successful payloads in `result`.
 
-| Method | Path | Purpose |
-|---|---|---|
-| POST | `/api/credit-applications` | Assess three financial inputs and create an account on approval |
-| GET | `/api/credit-applications/latest` | Latest application decision |
-| GET | `/api/credit-account` | Total, used and available limit |
-| POST | `/api/credit-drawdowns` | Use credit; requires `Idempotency-Key` |
-| GET | `/api/credit-drawdowns` | List drawdowns |
-| GET | `/api/credit-drawdowns/{id}` | Detail and four instalments |
-| POST | `/api/instalments/{id}/repay` | Pay the next unpaid instalment in full; requires `Idempotency-Key` |
-| GET | `/api/credit-drawdowns/{id}/repayments` | Simulated payment history |
+| Method | Path                                    | Purpose                                                            |
+| ------ | --------------------------------------- | ------------------------------------------------------------------ |
+| POST   | `/api/credit-applications`              | Assess three financial inputs and create an account on approval    |
+| GET    | `/api/credit-applications/latest`       | Latest application decision                                        |
+| GET    | `/api/credit-account`                   | Total, used and available limit                                    |
+| POST   | `/api/credit-drawdowns`                 | Use credit; requires `Idempotency-Key`                             |
+| GET    | `/api/credit-drawdowns`                 | List drawdowns                                                     |
+| GET    | `/api/credit-drawdowns/{id}`            | Detail and four instalments                                        |
+| POST   | `/api/instalments/{id}/repay`           | Pay the next unpaid instalment in full; requires `Idempotency-Key` |
+| GET    | `/api/credit-drawdowns/{id}/repayments` | Simulated payment history                                          |
 
 Example assessment body:
 
 ```json
-{"monthlyNetIncome":3000.00,"monthlyLivingExpenses":1400.00,"monthlyDebtPayments":500.00,"currency":"SGD"}
+{
+  "monthlyNetIncome": 3000.0,
+  "monthlyLivingExpenses": 1400.0,
+  "monthlyDebtPayments": 500.0,
+  "currency": "SGD"
+}
 ```
 
 Example utilization body and header:

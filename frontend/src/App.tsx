@@ -12,7 +12,13 @@ import {
   Sparkles,
   X,
 } from "lucide-react";
-import { ApiError, api, clearIdempotencyKey, idempotencyKey, optional } from "./lib/api";
+import {
+  ApiError,
+  api,
+  clearIdempotencyKey,
+  idempotencyKey,
+  optional,
+} from "./lib/api";
 import type {
   ApplicationInput,
   CreditAccount,
@@ -382,8 +388,14 @@ export default function App() {
 }
 
 function isDefinitiveFailure(cause: unknown): boolean {
-  return cause instanceof ApiError && cause.status !== undefined &&
-    cause.status >= 400 && cause.status < 500 && cause.status !== 408 && cause.status !== 429;
+  return (
+    cause instanceof ApiError &&
+    cause.status !== undefined &&
+    cause.status >= 400 &&
+    cause.status < 500 &&
+    cause.status !== 408 &&
+    cause.status !== 429
+  );
 }
 
 function messageOf(cause: unknown): string {
