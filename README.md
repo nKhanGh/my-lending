@@ -2,7 +2,7 @@
 
 Spring Boot 3 / Java 21 backend, React / TypeScript / CSS Modules frontend, and PostgreSQL. This is a multi-user simulator. It does not make real credit decisions or move real money.
 
-The original brief is preserved in [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md). The five later features are described in [EXTENSION_PLAN.md](EXTENSION_PLAN.md).
+The original brief is preserved in [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md). The five later features are described in [EXTENSION_PLAN.md](EXTENSION_PLAN.md). For business rules, diagrams, and trade-offs, see [MVP business logic](MVP_BUSINESS_LOGIC.md) and [extended business logic](EXTENDED_BUSINESS_LOGIC.md).
 
 ## Run locally
 
